@@ -25,7 +25,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(ioscan
 	
 );
-our $VERSION = '0.04';
+our $VERSION = '1.04_01';
 
 # Preloaded methods go here.
 
