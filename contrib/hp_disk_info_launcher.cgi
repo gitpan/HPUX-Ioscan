@@ -40,6 +40,9 @@ sub query_main {
 "<TR><TD>Postscript output?</TD><TD>",	radio_group(-name=>'cgi_postout',
                                 -values=>['yes', 'no'],
                                 -default=>'no'),"</TD></TR>",
+"<TR><TD>Extended Disk Info?</TD><TD>",	radio_group(-name=>'cgi_edi',
+                                -values=>['yes', 'no'],
+                                -default=>'no'),"</TD></TR>",
 "<TR><TD>Optional PS filename</TD><TD>",textfield('cgi_psfile_name'),"</TD></TR>",
 "<TR><TD>Optional LVM data filename</TD><TD>",textfield('cgi_datafile_name'),"</TD></TR>",
 "<TR><TD>remsh or ssh</TD><TD>",radio_group(-name=>'cgi_rtype',
@@ -57,6 +60,7 @@ sub query_main {
 if (param())    {
 	$final_hpname_test=$query->param('cgi_hpsystem_single');
 	$final_persist=$query->param('cgi_persist');
+	$final_edi=$query->param('cgi_edi');
 	if  ( $final_persist eq "yes" )	{
 		$final_persist="old";
 					}
@@ -77,7 +81,7 @@ if (param())    {
 	$final_rtype=$query->param('cgi_rtype');	
 if ( length($final_hpname_test) > 1 ) 		{
 	$final_hpname=$final_hpname_test;
-	$myurl = 'http://maximus.wireless.attws.com/cgi-bin/hp_disk_info.cgi?p_hpsystem='.$final_hpname.'&p_type='.$final_type.'&p_filesystemhl='.$final_fshighlight.'&p_rtype='.$final_rtype.'&p_post='.$final_post.'&p_loc_data='.$final_data_name.'&p_post_data='.$final_post_name.'&p_persist='.$final_persist;
+	$myurl = 'http://maximus.wireless.attws.com/cgi-bin/hp_disk_info.cgi?p_hpsystem='.$final_hpname.'&p_type='.$final_type.'&p_filesystemhl='.$final_fshighlight.'&p_rtype='.$final_rtype.'&p_post='.$final_post.'&p_loc_data='.$final_data_name.'&p_post_data='.$final_post_name.'&p_persist='.$final_persist.'&p_edi='.$final_edi;
 
 	print redirect(-uri=>"$myurl");
 						}
@@ -85,7 +89,7 @@ else						{
  	$final_hpname=$query->param('cgi_hpsystems');
 						}
 
-	$myurl = 'http://maximus.wireless.attws.com/cgi-bin/hp_disk_info.cgi?p_hpsystem='.$final_hpname.'&p_type='.$final_type.'&p_filesystemhl='.$final_fshighlight.'&p_rtype='.$final_rtype.'&p_post='.$final_post.'&p_loc_data='.$final_data_name.'&p_post_data='.$final_post_name.'&p_persist='.$final_persist;
+	$myurl = 'http://maximus.wireless.attws.com/cgi-bin/hp_disk_info.cgi?p_hpsystem='.$final_hpname.'&p_type='.$final_type.'&p_filesystemhl='.$final_fshighlight.'&p_rtype='.$final_rtype.'&p_post='.$final_post.'&p_loc_data='.$final_data_name.'&p_post_data='.$final_post_name.'&p_persist='.$final_persist.'&p_edi='.$final_edi;
 	print redirect(-uri=>"$myurl");
 
                 }

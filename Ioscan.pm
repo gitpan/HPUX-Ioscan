@@ -88,22 +88,22 @@ sub ioscan
 
         foreach my $line (@scan)
           {
-            #print $line ,"\n";
+#print $line ,"\n";
             if ($line =~ s/^\s+//)
               {
-                # file line
+# file line
                 push @{$cache->{$tmp_path}{device_files}}, split /\s+/,$line ;
               }
             else
               {
-                #device line
+#device line
                 my @fields = split(':',$line) ;
-                #print "nb field ", scalar @fields, " nb list ", scalar @list, "\n";
+#print "nb field ", scalar @fields, " nb list ", scalar @list, "\n";
                 my $i=0;
                 my %tmp ;
                 while (defined $list[$i])
                   {
-                    #print "$i: $list[$i],  $fields[$i]\n";
+#print "$i: $list[$i],  $fields[$i]\n";
                     $tmp{$list[$i++]} = $fields[$i] ;
                   }
 
@@ -132,7 +132,9 @@ sub new
         access_prog     => "ssh"        ,
         access_system   => "localhost"  ,
         access_user     => "root"       ,
+        extended_disk_info     => "yes"       ,
         remote_command1 => '/usr/sbin/ioscan -Fn',
+        remote_command2 => '/etc/diskinfo ',
         @subargs,
                         );
 
@@ -144,6 +146,7 @@ sub new
          print "access_system: $arglist{access_system}\n";
          print "access_user  : $arglist{access_user}\n";
          print "remote_command1: $arglist{remote_command1}\n";
+         print "remote_command1: $arglist{remote_command2}\n";
                         }
 
     my $source_access  =$arglist{target_type};
@@ -153,17 +156,29 @@ sub new
     my $remote_system  =$arglist{access_system};
     my $remote_user    =$arglist{access_user};
     my $remote_command =$arglist{remote_command1};
+    my $remote_command2 =$arglist{remote_command2};
 
     my $line;
     my $ioscan_hashref;
     my @ioscan_out;
     my %ioscan_info;
+    my $ioscan_info;
     my $ioscan_object_ref = \%ioscan_info;
 
         print "I'm :".ref($ioscan_object_ref)."\n" if $debug;
 
     my @ioscan_split;
     my $tmp_path ;
+#added the following to support diskinfo
+    my @extended_disk_array;
+    my $rawpvname;
+    my %rdiskhash;
+    my $line;
+    my @splitit;
+    my @device_file_check_raw;
+    my $device_file_check_raw;
+    my $line_outter;
+    my $debug8=0;
 
         print "I'm in class: $class\n" if $debug;
 	print "Command: $remote_access $remote_system -l $remote_user -n $remote_command\n" if $debug;
@@ -178,21 +193,89 @@ sub new
 	@ioscan_out=`$remote_access $remote_system -l $remote_user -n $remote_command`
 		or die "Could not execute remote command: $@\n";
 
-        foreach my $line (@ioscan_out)
-          {
+        foreach my $line (@ioscan_out) {
+          
             print $line ,"\n" if $debug;
             if ($line =~ s/^\s+//)
               { # file line
 		print "Matched line starting with device file\n" if $debug;
 		push @{ $ioscan_info{$ioscan_split[10]}->{device_files}  }, split /\s+/, $line;
+@device_file_check_raw = split /\s+/, $line; 
+print "device_file_check_raw = @device_file_check_raw<BR>\n" if $debug8;
+#
+# Me thinks diskinfo option should go here
+#
+print "Got here b4 diskinfo check.<BR>\n" if $debug;
+if ( $arglist{extended_disk_info} eq "yes" ) {
+	print "got here: diskinfo selected<BR>\n" if $debug8;
+foreach $line_outter ( @device_file_check_raw)	{
+	print "line_outter is: $line_outter<BR>\n" if $debug8;
+	if ( $line_outter =~ m/\/rdsk/g ) {
+	print "got past raw device match<BR>\n" if $debug8;
+	$line_outter =~ s/\/dev\/dsk\/c\wt\wd\w[s][\w]+//;
+	$line_outter =~ s/\s+//;
+	print "line_outter is now: $line_outter<BR>\n" if $debug8;
+  @extended_disk_array = `$remote_access $remote_system -l $remote_user -n $remote_command2 $line_outter`;
+  print "diskinfo command returned:<BR>\n" if $debug8;
+  print "@extended_disk_array<BR>\n" if $debug8;
+
+### parse diskinfo start
+        foreach $line ( @extended_disk_array )          {
+			
+                @splitit = split/:/, $line;
+                if ( $line =~ m/^\s*vendor/ )    {
+                        $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{vendor}=$splitit[1];
+			print "vendor $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{vendor}<BR>\n" if $debug8;
+                                                }
+                if ( $line =~ m/^\s*product id/ )        {
+#                       $rdiskhash{product_id}=$splitit[1];
+                        $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{product_id}=$splitit[1];
+			print "product id $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{product_id}<BR>\n" if $debug8;
+                                                        }
+                if ( $line =~ m/^\s*type/ )      {
+#                       $rdiskhash{type}=$splitit[1];
+                        $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{type}=$splitit[1];
+			print "type $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{type}<BR>\n" if $debug8;
+                                                }
+                if ( $line =~ m/^\s*size/ )      {
+#                       $rdiskhash{size}=$splitit[1];
+                        $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{size}=$splitit[1];
+			print "size $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{size}<BR>\n" if $debug8;
+                                                }
+                if ( $line =~ m/^\s*bytes per sector/ )  {
+#                       $rdiskhash{bytes_per_sector}=$splitit[1];
+                        $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{bytes_per_sector}=$splitit[1];
+			print "bytes per sector $ioscan_info{$ioscan_split[10]}->{diskinfo}->{$line_outter}->{bytes_per_sector}<BR>\n" if $debug8;
+                                                        }
+                                                        }
+#print "testing", $ioscan_object_ref->{$ioscan_split[10]->{$line_outter}->{size},"<BR>/n";
+#add the hash to the main hash
+# as an annonymous hash so it makes a new one each time.
+#$ioscan_object_ref->{$ioscan_split[10]}->{diskinfo}->{$line_outter}={ %rdiskhash };	
+							    };
+					}	
+@device_file_check_raw =();
+$line="";
+$line_outter="";
+@splitit=();
+%rdiskhash=();
+						}
+### parse diskinfo stop
+
+
+#
+# diskinfo option ends here
+#
 
               }
             else
               {
 		print "Matched actual device line\n" if $debug;
 		@ioscan_split = split /:/, $line;
-		# match keys to values from list above
+# match keys to values from list above
 		for (my $i=0 ; $i<19 ; $i++)	{ $ioscan_info{$ioscan_split[10]}{$list[$i]} = $ioscan_split[$i] };	
+#start of diskinfo
+#end of diskinfo
               }
           }
 	if ( $new_or_saved eq "new" )	{
@@ -250,7 +333,7 @@ sub traverse	{
 
 sub get_disk_controllers	{
 	my $self = shift;
-	my $debug = 1;
+	my $debug = 0;
 	my $mainkey;
 	my $subkey;
 
@@ -357,11 +440,64 @@ sub get_device_hwpath	{
 								 }
 								}
 							}
-	$device_name=0;
+	$device_name="";
 	return undef; 
 				}
+
+
+sub get_device_diskinfo   {
+        my ($self, @subargs) = @_;
+
+        my %arglist      =      (
+                device_name     =>"",
+		attribute	=>"",
+                @subargs,
+                                );
+        my $debug;
+        my $mainkey;
+        my $subkey;
+        my $subval;
+        my $device_name = $arglist{device_name};
+        my $attribute   = $arglist{attribute};
+	my $device_name_raw;
+        my %diskinfo_hash;
+	my $diskinfo_attribute;
+	my $scalar_diskinfo_hash;
+	my %self;
+
+#First find the instance
+        foreach $mainkey        ( sort keys %{ $self } )        {
+         print "MainKey: $mainkey\n" if $debug;
+
+        while ( ($subkey, $subval)= sort each %{ $self->{ $mainkey } } )  {
+         print "Subkey: $subkey\n" if $debug;
+         print "Subval: $subval\n" if $debug;
+         if (defined ${ $self->{$mainkey}->{device_files} }[0]) {
+                        if ( ${ $self->{$mainkey}->{device_files} }[0] eq "$device_name" )    {
+		$device_name_raw = $device_name;
+		$device_name_raw =~ s/\/dsk\//\/rdsk\//;
+#			$mainkey = "\'".$mainkey."\'";
+#			$device_name_raw = "\'".$device_name_raw."\'";
+                if  ( exists( $self->{$mainkey}->{diskinfo}->{$device_name_raw}->{$attribute} ) )	{
+			print "It exists!\n" if $debug;
+			print "mainkey: $mainkey\n" if $debug;
+			print "device_name_raw: $device_name_raw\n" if $debug;
+#			$device_name_raw = "\'".$device_name_raw."\'";
+			$diskinfo_attribute = $self->{$mainkey}->{diskinfo}->{$device_name_raw}->{$attribute};
+#			print "Keys of main hash: ",each %$self->{$mainkey}->{diskinfo}->{$device_name_raw},"<R>\n";
+											}
+                return $diskinfo_attribute;
+                }
+                                                                 }
+                                                                }
+                                                        }
+        $device_name="";
+        return undef;
+                                }
 1;
+
 __END__
+
 # Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
@@ -433,7 +569,7 @@ device files attached to the hardware path.
 
 =head1 EXAMPLE
 
-Here's an example of the structure returned for 1 disk:
+Heres an example of the structure returned for 1 disk:
 
  $result = 
   {
@@ -489,6 +625,10 @@ Here's an example of the structure returned for 1 disk:
   $hwpathinfo = $ioscan_data->get_class(
 		hwpath	=> $hwpath
 					)
+  $disk_size = $ioscan_data->get_device_diskinfo(
+		device_name => "/dev/dsk/c1t4d0"
+		attribute   => "size"
+					)
 
 =head1 DESCRIPTION
 
@@ -515,6 +655,7 @@ It accepts the following paramters:
 	persistance 	values: new(default) or old
 	access_prog 	values: ssh(default) or remsh
 	access_system 	values: localhost(default) or remote system name
+	extended_disk_info values:yes or no(default)
 	access_user	values: root(default) or remote username
 
 The value is another hash ref containing there keys :
@@ -544,7 +685,7 @@ See L<ioscan>(1M) for the meaning of these keys.
 
 =head1 EXAMPLE
 
-Here's an example of the structure returned for 1 disk:
+Heres an example of the structure returned for 1 disk:
 
  $result = 
   {
@@ -576,6 +717,50 @@ Here's an example of the structure returned for 1 disk:
        },
  }
 
+=head1 EXAMPLE
+
+Partial Ioscan Object (disk only).  Illustrates the optional extended diskinfo option.
+
+ $result =
+  {
+'0/12/0/0.104.7.19.1.7.0' => HASH(0x403c18b8)
+   'block_major_number' => 31
+   'bus_type' => 'scsi'
+   'card_instance' => 9
+
+   'cdio' => 'wsio'
+   'character_major_number' => 188
+   'class' => 'disk'
+   'description' => 'HP      OPEN-L'
+   'device_files' => ARRAY(0x403c19c0)
+      0  '/dev/dsk/c9t7d0'
+      1  '/dev/rdsk/c9t7d0'
+   'diskinfo' => HASH(0x403c1924)
+      '/dev/rdsk/c9t7d0' => HASH(0x403c193c)
+         'bytes_per_sector' => ' 0
+'
+         'product_id' => ' OPEN-L          
+'
+         'size' => ' 0 Kbytes
+'
+         'type' => ' direct access
+'
+         'vendor' => ' HP      
+'
+   'driver' => 'sdisk'
+   'hardware_path' => '0/12/0/0.104.7.19.1.7.0'
+   'hardware_type' => 'DEVICE'
+   'identify_bytes' => '32 0 2 2 0 0 0 0 175 10 43 213 190 8 246 137 '
+   'instance_number' => 76
+   'is_block' => 'T'
+   'is_char' => 'T'
+   'is_pseudo' => 'F'
+   'minor_number' => 618496
+   'module_name' => 'sdisk'
+   'module_path' => 'root.sba.lba.td.fcp.fcparray.tgt.sdisk'
+   'software_state' => 'CLAIMED'
+ }
+
 =head2 get_disk_controllers()
 
   return a refrence to an array of all the disk controller paths.
@@ -591,6 +776,10 @@ Here's an example of the structure returned for 1 disk:
 =head2 get_device_hwpath(device_name=>'/dev/dsk/c4t3d0')
 
   returns a scalar value of the hwpath to the device used for further device info lookups
+
+=head2 get_device_diskinfo(device_name=>'/dev/dsk/c4t3d0', attribute=>'size')
+
+  returns a scalar value of the diskinfo commands attributes
 
 
 =head1 CAVEATS

@@ -15,3 +15,12 @@ array.
 Updated hp_disk_info.cgi's postscript routines
 added hp_disk_info_text.pl to contrib dir
 
+1.09_02
+
+Added optional extended_disk_info option that hashes the diskinfo output
+for disk devices.
+
+Updates contrib files to optionally use the extended disk info option.
+
+Some minor Postscript output updates on hp_disk_info.cgi.  Still experimental
+(not to mention a pain in the rear)

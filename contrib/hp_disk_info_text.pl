@@ -58,6 +58,8 @@ format STDDISKSTART =
                 $tmplinks
         |          ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  |
                 $tmplinks
+        | Size   : ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  |
+                $extended_disk_info_size
          ==========================================
 .
 format STDDISKEND =
@@ -106,6 +108,7 @@ $sub_rtype = $opt_r;
 $sub_loc_data  = $opt_l   || '/tmp/lvminfo.dat';
 $sub_show_empty  = $opt_v || 'no';
 $sub_persist  = $opt_p || 'new';
+$sub_extended_disk_info  = $opt_e || 'yes';
 
 $|=1;
 
@@ -117,7 +120,8 @@ my $lvminfo_data = new HPUX::LVM(
                                 datafile        =>"$sub_loc_data",
                                 access_prog     =>"$sub_rtype",
                                 access_system   =>"$sub_system",
-                                access_user     =>"root"
+                                access_user     =>"root",
+				extended_disk_info =>"no"
                                 );
 
 my $ioscan_data = new HPUX::Ioscan(
@@ -126,7 +130,7 @@ my $ioscan_data = new HPUX::Ioscan(
 				access_prog	=>"$sub_rtype",
 				access_system	=>"$sub_system",
 				access_user	=>"root",
-				access_speed	=>"slow"
+				extended_disk_info =>"$sub_extended_disk_info",
 				);
 my $fsinfo_data = new HPUX::FS(
 				target_type	=>"local",
@@ -210,6 +214,11 @@ else				{
 	   @links="No Alternate Links";
 				}
 $tmplinks=join("  ", @links);
+$extended_disk_info_ref = $ioscan_data->get_device_diskinfo(
+					        device_name => $dsk
+						    );
+%extended_disk_info = %$extended_disk_info_ref;
+$extended_disk_info_size = $extened_disk_info{size};
 #
 #NEW Got disk info
 #

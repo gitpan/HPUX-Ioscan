@@ -30,6 +30,7 @@ $sub_post  = $query->param('p_post') || "0";
 $sub_loc_data  = $query->param('p_loc_data')   || '/tmp/lvminfo.dat';
 $sub_post_data  = $query->param('p_post_data') || '/tmp/postout.ps';
 $sub_show_empty  = $query->param('p_show_empty') || 'no';
+$sub_extended_disk_info  = $query->param('p_edi') || 'no';
 $sub_persist  = $query->param('p_persist') || 'new';
 
 # Cgi setup stuff
@@ -73,7 +74,7 @@ $mystyle=<<END;
 END
 
 #check for postscript output option
-# if sub_post=1 then do it.
+#shit if sub_post=1 then do it.
 
 if ( $sub_post ) {
 	open (POSTOUT, ">$sub_post_data") or die "Unable to open postfile\n";
@@ -102,6 +103,7 @@ my $ioscan_data = new HPUX::Ioscan(
 				access_prog	=>"$sub_rtype",
 				access_system	=>"$sub_system",
 				access_user	=>"root",
+				extended_disk_info	=>"$sub_extended_disk_info",
 				access_speed	=>"slow"
 				);
 print "<\BR><\BR>";
@@ -171,6 +173,19 @@ print POSTOUT "\($contr Inst: $instance\) DoRowTitle\n";
 #	push @rows_good, th({ -bgcolor=>$html_cellheadercolor, class=>'smallcontenthead' }, \@headers);
 # adding some kind of device file sort order here:
 	foreach $dsk ( @{ $arref2 } )	{
+#
+# Adding diskinfo option here
+#
+	if ( $sub_extended_disk_info eq "yes" )	{
+		$disk_size = $ioscan_data->get_device_diskinfo(
+						device_name 	=> $dsk,
+						attribute	=> size,
+							 ) || "N/A";
+		print "disk_size: $disk_size\n" if $debug;
+						}	
+#
+# End of diskinfo option
+#
 	$buffouttable_final=$buffouttable_final.'<TD VALIGN=top>';
 	push @rows_good, th({ -bgcolor=>$html_cellheadercolor, class=>'smallcontenthead' }, \@headers);
          	print "disk: $dsk\n" if $debug;
@@ -306,7 +321,6 @@ if ($maxentries < $tableentries)	{
 	print "No alternate links found!\n" if $debug5;
 	$disk_n_alt_good=$dsk;
 									}
-	 
 		if (scalar(@check_keys) == 0 )	{
 		$psbuff = "\(\) \( $ps_disk_n_alt_good \) MakeHeaderalt\n".$psbuff;
 			print "No LVM found on this\n" if $debug5;
@@ -336,7 +350,12 @@ if ($maxentries < $tableentries)	{
 			pop @rows_good;
 			pop @rows_good;
 			push @rows_good, td({-bgcolor=>$html_cellcolor, -class=>'smallcontent'}, [ $myclass, $mydriver, $mydesc ]);
+			if ($disk_size ne "" && $sub_extended_disk_info ne "yes" )	{
 			$disk_n_alt_good = $disk_n_alt_good.'<FONT COLOR=RED><BR>NOT IN LVM</FONT>';
+						}
+			else			{
+			$disk_n_alt_good = $disk_n_alt_good.'<FONT COLOR=RED><BR>NOT IN LVM</FONT>';
+						}
 #Add Disk Alternate Link Check Here
 foreach $keyme ( sort keys %linkhash )     {
         print "Key: $keyme\n" if $debug8;
@@ -393,7 +412,17 @@ foreach $keyme ( sort keys %linkhash )     {
 		$psbuff = "\(\) \( $disk_n_alt_good \) MakeHeader\n".$psbuff;
 		print POSTOUT $psbuff;
 		}
+#
+# add the Size header
+#
+			if ( $sub_extended_disk_info eq "yes" )	{
+	$disk_n_alt_good=$disk_n_alt_good.'<BR>Size:'.$disk_size;
+						}
+#
+# end of adding size header
+#
 #set it back
+
 	@headers=( "LVOL", "MNTPT", "EXT" );
 $buffouttable_single =  table({-border=>$html_border,-width=>'25%', -class=>'smallcontent'},
                         caption({-bgcolor=>$html_cellcolor, -class=>'smallcontent' },$disk_n_alt_good),
