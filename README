@@ -1,0 +1,44 @@
+
+This module works on top of the HP-UX command ioscan. It forks a
+process to run the ioscan command and parses its STDOUT. The result is
+returned in a hash.
+
+Note that this module can work ONLY on HP-UX.
+
+Suggested DSLI line :
+
+HPUX
+  Ioscan  bdpf  Perl function to handle HPUX ioscan commandk   DDUMONT
+
+The test will skip the actual ioscan command unles you are running on
+a HP-UX system as superuser. I guess than you will have to trust me
+with this module ... ;-)
+
+See the embedded documentation in the module for more details.
+
+Comments and suggestions are always welcome.
+
+Legal mumbo jumbo:
+
+ Copyright (c) 2001 Dominique Dumont. All rights reserved.
+ This program is free software; you can redistribute it and/or
+ modify it under the same terms as Perl itself.
+
+ - Dominique Dumont
+   dominique_dumont@grenoble.hp.com
+
+---------------------------------------------------------------------
+INSTALLATION
+
+   	 gunzip -c <dist_file>.tar.gz | tar xvf -
+   	 cd <dist_directory>
+   	 perl Makefile.PL
+   	 make test          
+   	 make install
+
+
+
+
+
+
+

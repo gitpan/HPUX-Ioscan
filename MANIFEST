@@ -1,0 +1,6 @@
+Ioscan.pm
+Makefile.PL
+MANIFEST
+README
+t/ioscan.t
+t/real.t
