@@ -482,7 +482,8 @@ print POSTOUT "        /totalxmove 0 def","\n";
 print POSTOUT "        /totalymove 0 def","\n";
 print POSTOUT "        /totaltranslate 0 def","\n";
 print POSTOUT "        /negtotaltranslate 0 def","\n";
-print POSTOUT "        showpage","\n";
+#added 20 translate so each page starts futher down
+print POSTOUT "        showpage 20 0 translate","\n";
 print POSTOUT "                } if","\n";
 print POSTOUT "        }def","\n";
 
