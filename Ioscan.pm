@@ -1,10 +1,44 @@
-package HPUX::Ioscan ;
-use strict ;
+package HPUX::Ioscan;
+
+use 5.006;
+use strict;
+use warnings;
+
+require Exporter;
+use AutoLoader qw(AUTOLOAD);
+
+our @ISA = qw(Exporter);
+
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+
+# This allows declaration	use HPUX::Ioscan ':all';
+# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
+# will save memory.
+our %EXPORT_TAGS = ( 'all' => [ qw(
+	
+) ] );
+
+our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+
+our @EXPORT = qw(ioscan
+	
+);
+our $VERSION = '0.04';
+
+# Preloaded methods go here.
+
+# Autoload methods go after =cut, and are processed by the autosplit program.
+
+
+## start
+
+
 use FileHandle ;
+use Carp ;
 use vars qw/@ISA @EXPORT $test $VERSION $AUTOLOAD/;
 use Storable;
-
-$VERSION = sprintf "%d.%03d", q$Revision: 1.3 $ =~ /(\d+)\.(\d+)/;
 
 my @list = 
   qw/bus_type
@@ -26,6 +60,63 @@ my @list =
   hardware_type 
   description
   card_instance/;
+
+my $cache ;
+
+sub ioscan
+  {
+    my %args = @_ ;
+    my $tmp_path ;
+    my $force = $args{force} || 0;
+
+    if (not defined $cache or $force)
+      {
+        my @scan ;
+        if (defined $test)
+          {
+            @scan = @$test ;
+          }
+        else
+          {
+            my $fh = new FileHandle;
+            $fh->open ('ioscan -nF |')
+              or croak "can't open ioscan pipe $!\n";
+            @scan = <$fh>;
+            $fh->close;
+            die "Ioscan error: $!\n" if $! ;
+          }
+
+        foreach my $line (@scan)
+          {
+            #print $line ,"\n";
+            if ($line =~ s/^\s+//)
+              {
+                # file line
+                push @{$cache->{$tmp_path}{device_files}}, split /\s+/,$line ;
+              }
+            else
+              {
+                #device line
+                my @fields = split(':',$line) ;
+                #print "nb field ", scalar @fields, " nb list ", scalar @list, "\n";
+                my $i=0;
+                my %tmp ;
+                while (defined $list[$i])
+                  {
+                    #print "$i: $list[$i],  $fields[$i]\n";
+                    $tmp{$list[$i++]} = $fields[$i] ;
+                  }
+
+                $tmp_path = $tmp{hardware_path} ;
+                $cache->{$tmp_path} = \%tmp ;
+              }
+          }
+      }
+
+    return $cache->{hardware_path} if defined $args{hardware_path};
+
+    return $cache ;
+  }
 
 sub new
   {
@@ -240,9 +331,9 @@ sub get_device_hwpath	{
 	$device_name=0;
 	return undef; 
 				}
-
 1;
 __END__
+# Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
 
@@ -492,3 +583,5 @@ under the same terms as Perl itself.
 
 L<ioscan>(1M)
 
+## end
+=cut
