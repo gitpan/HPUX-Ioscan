@@ -1,0 +1,17 @@
+Revision history for Perl extension HPUX::Ioscan.
+
+Original version Created
+
+11/29/01 Modified to include OO interface
+
+0.06
+
+Added routine to sort devices files numerically in
+get_all_disks_on_controller and return the ordered
+array.
+
+0.07
+
+Updated hp_disk_info.cgi's postscript routines
+added hp_disk_info_text.pl to contrib dir
+

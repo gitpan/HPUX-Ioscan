@@ -21,6 +21,10 @@ You might have to increase your webservers timeout variable to allow enough time
 
 Brief Mod History:
 
+Tue May 1, 2002
+
+created a text command line version of the script.
+
 Tue Jan 22 12:44:39 PST 2002
 
 -Added hooks to identify alternate links and link#
@@ -28,10 +32,12 @@ Tue Jan 22 12:44:39 PST 2002
 -Added to modules Ioscan, LVM and FS.
 -Updated MANIFEST file
 
-Mon Jan 21
+Mon Jan 21 2002
 
 -Added old and new option to launcher cgi
 -embeded launcher cgi into a table so it looks better
+
+
 
 ToDo:
 

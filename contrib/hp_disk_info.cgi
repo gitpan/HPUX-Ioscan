@@ -14,6 +14,7 @@ $debug=0;
 $debug5=0;
 $debug6=0;
 $debug8=0;
+$debug9=0;
 $tablecnt=0;
 $maxentries=0;
 $tableentries=0;
@@ -43,8 +44,6 @@ $sub_persist  = $query->param('p_persist') || 'new';
 		$html_cellfontcolor	="000000";
 
 
-$query=new CGI;
-
 $|=1;
 
 $myjavascript=<<END;
@@ -68,8 +67,8 @@ END
 
 $mystyle=<<END;
 <!--
-.smallContent { font-family: Verdana, Arial, Helvetica; font-size: .7em; color: black;}
-.smallContenthead { font-family: Verdana, Arial, Helvetica; font-size: .7em; color: white;}
+.smallContent { font-family: Verdana, Arial, Helvetica; font-size: .8em; color: black;}
+.smallContenthead { font-family: Verdana, Arial, Helvetica; font-size: .8em; color: white;}
 -->
 END
 
@@ -95,16 +94,17 @@ my $lvminfo_data = new HPUX::LVM(
                                 access_system   =>"$sub_system",
                                 access_user     =>"root"
                                 );
-print "<BR></BR>";
+print "<\BR><\BR>";
 
 my $ioscan_data = new HPUX::Ioscan(
 				target_type	=>"local",
 				persistance	=>"$sub_persist",
 				access_prog	=>"$sub_rtype",
 				access_system	=>"$sub_system",
-				access_user	=>"root"
+				access_user	=>"root",
+				access_speed	=>"slow"
 				);
-print "<BR></BR>";
+print "<\BR><\BR>";
 my $fsinfo_data = new HPUX::FS(
 				target_type	=>"local",
 				persistance	=>"$sub_persist",
@@ -112,7 +112,7 @@ my $fsinfo_data = new HPUX::FS(
 				access_system	=>"$sub_system",
 				access_user	=>"root"
 				);
-print "<BR></BR>";
+print "<\BR><\BR>";
 
 #sample data structure traverse methods
 #$junkme1	= $lvminfo_data->traverse();
@@ -164,16 +164,12 @@ print POSTOUT "\($contr Inst: $instance\) DoRowTitle\n";
 			}
 
 	$buffouttable_final=$buffouttable_final.'<TR><TH>'.$contr.'<BR> Inst: '.$instance.'<BR> Desc:'.$instance_desc.'</TH>';
-
 	
-	$arref2 = $ioscan_data->get_all_disks_on_controller	(
-				controller	=>"$contr"
-								);
 	@rows=();
 	@rows_good=();
 	@headers=( "LVOL", "MNTPT", "EXT" );
 #	push @rows_good, th({ -bgcolor=>$html_cellheadercolor, class=>'smallcontenthead' }, \@headers);
-
+# adding some kind of device file sort order here:
 	foreach $dsk ( @{ $arref2 } )	{
 	$buffouttable_final=$buffouttable_final.'<TD VALIGN=top>';
 	push @rows_good, th({ -bgcolor=>$html_cellheadercolor, class=>'smallcontenthead' }, \@headers);
@@ -205,6 +201,11 @@ print POSTOUT "\($contr Inst: $instance\) DoRowTitle\n";
 			 		device_name	=> "$dsk",
 			 		attribute	=> "Total_PE" 
 								);
+			$stripes_on_lv = $lvminfo_data->get_vg_lvol_attr_lvdisplay(
+					volume_group	=> "$lv_vg",
+					logical_vol	=> "$lvol",
+					attribute	=> "Stripes"
+								);
 			print "Total PE On PV=$total_pe_on_pv\n" if $debug;
 			print "Volume Group: $lv_vg\n" if $debug;
 			$lvolshow = $lv_vg.'/'.$lvol;
@@ -214,7 +215,25 @@ print POSTOUT "\($contr Inst: $instance\) DoRowTitle\n";
 				filesystem	=> "$lvolshow",
 				attribute	=> 'directory'
 								);
-			if ( $mntpt eq "$sub_fshighlight" )	{
+			if ( $stripes_on_lv gt 0 )	{
+#If stripes then do something useful
+			$ordered_stripes_arr_ref = $lvminfo_data->get_vg_lvol_stripeorder(
+					volume_group	=> "$lv_vg",
+					logical_vol	=> "$lvol"
+								);
+			@ordered_stripes = @$ordered_stripes_arr_ref;
+			$stripe_index=0;
+			for ($i = 0; $i< @ordered_stripes ; $i++ ) 	{
+				print "Ordered_stripes: $ordered_stripes[$i]\n<BR>" if $debug9;
+				print "dsk: $dsk\n<BR>" if $debug9;
+				if ( $ordered_stripes[$i] eq $dsk )	{
+					$stripe_index=$i+1;
+								}	
+									}
+
+				$mntpt=$mntpt.'(Stripe '.$stripe_index.' of '.scalar(@ordered_stripes);
+							}
+			if ( $mntpt eq "$sub_fshighlight" && $sub_fshighlight ne "" )	{
 				$mntpt = '<FONT COLOR=RED>'.$mntpt.'</FONT>';
 								}
 			push @rows, $mntpt;
@@ -226,7 +245,7 @@ print POSTOUT "\($contr Inst: $instance\) DoRowTitle\n";
 			push @rows_good, td({-bgcolor=>$html_cellcolor, -class=>'smallcontent'}, \@rows);
 	if ($sub_post)	{
 	$tablecnt++;
-	$psbuff=$psbuff."\($rows[0]\) \($rows[1]\) \($rows[2]\) DoRow\n";
+	$psbuff=$psbuff."\($rows[0]\) \($rows[1]\) \($rows[2]\) DoShadeRow\n";
 	$psbufflen=$psbufflen."\($rows[0]\) check_length \($rows[1]\) check_length \($rows[2]\) check_length\n";
 			}
 	@rows=();
@@ -250,14 +269,23 @@ if ($maxentries < $tableentries)	{
 	push @rows_good,td({ -bgcolor=>$html_cellheadercolor, -class=>'smallcontenthead'}, \@free_line);
 
 	if ($sub_post and $tableentries_save)	{
-	$psbuff=$psbuff."\($total_pe_on_pv\) \($free_pe_on_pv\ ) DoTotalandFree\n";
+#	$psbuff=$psbuff."\($total_pe_on_pv\) \($free_pe_on_pv\ ) DoTotalandFree ".($tableentries_save+4)." check_ywrap\n";
+	$psbuff=$psbuff."\($total_pe_on_pv\) \($free_pe_on_pv\ ) DoTotalandFree \n";
 	$psbuff=$psbuff."/maxlength 0 def\n";
 	$psbuff=$psbuff."/negmaxlength 0 def\n";
 	$psbuff=$psbuff."\n";
-	$psbuff=$psbuff."0 tablewidth htablepad add translate\n";
 	$psbuff=$psbuff."tablewidth totalrowwidthcalc\n";
+	$psbuff=$psbuff."0 tablewidth htablepad add pretranslate \n";
 	print "tableEntries_save is: $tableentries_save<BR>\n" if $debug;
-	$psbuff=$psbuff."cellh \-".($tableentries_save+2)." mul 0 translate\n";
+	$psbuff=$psbuff."cellh \-".($tableentries_save+2)." mul 0 pretranslate\n";
+	$psbuff=$psbuff."check_xwrap\n";
+#temp add
+	$psbuff=$psbuff.($tableentries_save+4)." check_ywrap\n";
+#		$psbuff=$psbuff."0 negtotaltranslate translate\n";
+#		$psbuff=$psbuff."/totaltranslate 0 def","\n";
+#		$psbuff=$psbuff."/negtotaltranslate 0 def","\n";
+#		$psbuff=$psbuff."/maxlength 0 def","\n";
+#		$psbuff=$psbuff."/negmaxlength 0 def","\n";
 	$post_tablecnt++;
 			}
 # Add alternate links to disk
@@ -268,9 +296,11 @@ if ($maxentries < $tableentries)	{
 	print "disk_n_alt is:$disk_n_alt\n" if $debug5;
 	print "disk_n_alt value is:@$disk_n_alt\n" if $debug5;
 	@disk_n_alt_conv = @$disk_n_alt;
+	$ps_disk_n_alt_good=$dsk;
 	if ($disk_n_alt_conv[0] ne "None" and $disk_n_alt_conv[0] ne "NotDefined" )	{
 	print "Alternate links found!\n" if $debug5;
-	$disk_n_alt_good = $dsk.'<BR><FONT COLOR=WHITE>'.join('(link)<BR>', @disk_n_alt_conv).'(link)</FONT>';
+	$ps_disk_n_alt_good=$dsk."LINK DATA";
+	$disk_n_alt_good = $dsk.'<BR><FONT COLOR=GREEN>'.join('(link)<BR>', @disk_n_alt_conv).'(link)</FONT>';
 									}
 	else								{
 	print "No alternate links found!\n" if $debug5;
@@ -278,10 +308,11 @@ if ($maxentries < $tableentries)	{
 									}
 	 
 		if (scalar(@check_keys) == 0 )	{
-		$psbuff = "\(\) \( $disk_n_alt_good \) MakeHeaderalt\n".$psbuff;
+		$psbuff = "\(\) \( $ps_disk_n_alt_good \) MakeHeaderalt\n".$psbuff;
 			print "No LVM found on this\n" if $debug5;
 			print "Adding 1 to maxentries<BR>\n" if $debug;
 			print "Makeing tableenties_save 1<BR>\n" if $debug;
+			$maxentries++;
 			$tableentries_save=1;
 #
 # If no LVM Found change the headings to device info type headings
@@ -324,19 +355,22 @@ foreach $keyme ( sort keys %linkhash )     {
 							}
                                                         	}
                                         }
-			$psbuff=$psbuff."\($myclass\) \($mydriver\) \($mydesc\) DoRow\n";
+			$psbuff=$psbuff."\($myclass\) \($mydriver\) \($mydesc\) DoShadeRow\n";
 			$psbufflen=$psbufflen."\($myclass\) check_length \($mydriver\) check_length \($mydesc\) check_length\n";
 		$psbuff=$psbuff."/maxcellwidth maxlength def\n";
 		$psbuff=$psbuff."/negmaxcellwidth maxcellwidth -1 mul def\n";
 		$psbuff=$psbuff."/tablewidth maxcellwidth 3 mul def\n";
 		$psbuff=$psbuff."/negtablewidth maxcellwidth  -3 mul def\n";
-	$psbuff=$psbuff."\(NA\) \(NA\ ) DoTotalandFree\n";
+#	$psbuff=$psbuff."\(NA\) \(NA\ ) DoTotalandFree ".($tableentries_save+4)." check_ywrap\n";
+	$psbuff=$psbuff."\(NA\) \(NA\ ) DoTotalandFree \n";
 	$psbuff=$psbuff."/maxlength 0 def\n";
 	$psbuff=$psbuff."/negmaxlength 0 def\n";
-	$psbuff=$psbuff."0 tablewidth htablepad add translate\n";
 	$psbuff=$psbuff."tablewidth totalrowwidthcalc\n";
+	$psbuff=$psbuff."0 tablewidth htablepad add pretranslate\n";
 	print "Just added ending stuff to non lvm table<BR>\n" if $debug;
-	$psbuff=$psbuff."cellh \-".($tableentries_save+2)." mul 0 translate\n";
+	$psbuff=$psbuff."cellh \-".($tableentries_save+2)." mul 0 pretranslate\n";
+#temp add
+	$psbuff=$psbuff.($tableentries_save+4)." check_ywrap\n";
 	$psbuff=$psbuff."\n";
 	$psbuff=$psbuff."\n";
 	$psbuff=$psbuff."\n";
@@ -375,10 +409,10 @@ $buffouttable_final = $buffouttable_final.'</TR>';
 if ($sub_post)	{
 #		rewind to start of row
 		$post_backup = $post_tablecnt*200;
-		print POSTOUT "%Move to next row plus 2 row lengths\n";
-	        print POSTOUT "cellh ".($maxentries+2)." mul 0 translate\n";
-		print POSTOUT "cellh 2 mul 0 translate\n";
-		print POSTOUT "0 negtotaltranslate translate\n";
+		print POSTOUT "%Move to next row plus 4 row lengths\n";
+	        print POSTOUT "cellh 4 mul 0 pretranslate\n";
+		print POSTOUT "cellh 4 mul 0 pretranslate\n";
+		print POSTOUT "0 negtotaltranslate pretranslate\n";
 		print POSTOUT "/totaltranslate 0 def","\n";
 		print POSTOUT "/negtotaltranslate 0 def","\n";
 		print POSTOUT "/maxlength 0 def","\n";
@@ -403,6 +437,8 @@ print POSTOUT "%These values can be changed to whatever your prefrence","\n";
 print POSTOUT "%","\n";
 print POSTOUT "%height of font","\n";
 print POSTOUT "/fonth 4 def","\n";
+print POSTOUT "%global left margin","\n";
+print POSTOUT "0 20 translate","\n";
 print POSTOUT "%space between font and top/bottom of cell","\n";
 print POSTOUT "/fontpad 2 def","\n";
 print POSTOUT "%defines start of total row translation","\n";
@@ -410,6 +446,10 @@ print POSTOUT "/totaltranslate 0 def","\n";
 print POSTOUT "/negtotaltranslate 0 def","\n";
 print POSTOUT "%amount of pading between tables","\n";
 print POSTOUT "/htablepad 4 def","\n";
+print POSTOUT "%amount of points for whole sheet width lanscape","\n";
+print POSTOUT "/widthofsheet 792 def";
+print POSTOUT "%amount of points for whole sheet length tall","\n";
+print POSTOUT "/lengthofsheet 612 def","\n";
 print POSTOUT "%amount of padding between rows","\n";
 print POSTOUT "/vtablepad 4 def","\n";
 print POSTOUT "%left margin","\n";
@@ -418,6 +458,11 @@ print POSTOUT "/rightmargin 10 def","\n";
 print POSTOUT "%left side buffer between cell start and value","\n";
 print POSTOUT "/lbuffstr 2 def","\n";
 print POSTOUT "/maxlength 0 def","\n";
+print POSTOUT "%pre translate variables","\n";
+print POSTOUT "/xmove 0 def","\n";
+print POSTOUT "/ymove 0 def","\n";
+print POSTOUT "/totalxmove 0 def","\n";
+print POSTOUT "/totalymove 0 def","\n";
 print POSTOUT "%","\n";
 print POSTOUT "%------------procedures","\n";
 print POSTOUT "%","\n";
@@ -428,6 +473,27 @@ print POSTOUT "  /maxlength newlen def","\n";
 print POSTOUT "  /negmaxlength newlen -1 mul def","\n";
 print POSTOUT "             } if","\n";
 print POSTOUT "                } def","\n";
+
+print POSTOUT "/check_xwrap {","\n";
+print POSTOUT " totalxmove 500 gt {%if","\n";
+print POSTOUT "        /xmove 0 def","\n";
+print POSTOUT "        /ymove 0 def","\n";
+print POSTOUT "        /totalxmove 0 def","\n";
+print POSTOUT "        /totalymove 0 def","\n";
+print POSTOUT "        /totaltranslate 0 def","\n";
+print POSTOUT "        /negtotaltranslate 0 def","\n";
+print POSTOUT "        showpage","\n";
+print POSTOUT "                } if","\n";
+print POSTOUT "        }def","\n";
+
+print POSTOUT "%pre pretranslate to keep track of x","\n";
+print POSTOUT "/pretranslate   {","\n";
+print POSTOUT "        /ymove exch def","\n";
+print POSTOUT "        /xmove exch def","\n";
+print POSTOUT "        /totalymove totalymove ymove add def","\n";
+print POSTOUT "        /totalxmove totalxmove xmove add def","\n";
+print POSTOUT "        xmove ymove translate","\n";
+print POSTOUT "                } def","\n";
 print POSTOUT "%keep track of total table width (including the padding between them) as","\n";
 print POSTOUT "% add them all up as we go so we know how much to translate back to the","\n";
 print POSTOUT "% start.","\n";
@@ -435,6 +501,37 @@ print POSTOUT "/totalrowwidthcalc   {%def","\n";
 print POSTOUT "  htablepad add totaltranslate add /totaltranslate exch def ","\n";
 print POSTOUT "  /negtotaltranslate totaltranslate -1 mul def ","\n";
 print POSTOUT "                   } def","\n";
+print POSTOUT "\n";
+print POSTOUT "%Check to see how far over we can go before wrapping","\n";
+print POSTOUT "/check_ywrap {","\n";
+print POSTOUT " /curr_xtrans exch def","\n";
+print POSTOUT " /curr_xtrans curr_xtrans cellh mul cellh add def","\n";
+print POSTOUT "  widthofsheet 200 sub totaltranslate lt  {%if","\n";
+print POSTOUT "         0 negtotaltranslate pretranslate","\n";
+print POSTOUT "         curr_xtrans 0 pretranslate","\n";
+print POSTOUT "         /totaltranslate 0 def","\n";
+print POSTOUT "         /negtotaltranslate 0 def","\n";
+# add a spacer
+print POSTOUT "(CONTINUED ROW) check_length","\n";
+#print POSTOUT "() (CONTINUED ROW) MakeHeader","cellh 0 pretranslate\n";
+print POSTOUT "cellh 0 pretranslate\n";
+#print POSTOUT "(CONTINUED ROW) (CONTINUED ROW) (CONTRINUED ROW) DoShadeRow","cellh 0 pretranslate\n";
+print POSTOUT "cellh 0 pretranslate\n";
+print POSTOUT "/maxcellwidth maxlength def         ","\n";
+print POSTOUT "/negmaxcellwidth maxcellwidth -1 mul def         ","\n";
+print POSTOUT "/tablewidth maxcellwidth 3 mul def         ","\n";
+print POSTOUT "/negtablewidth maxcellwidth -3 mul def         ","\n";
+#print POSTOUT "(NA) (NA) DoTotalandFree         ","cellh 0 pretranslate cellh 0 pretranslate\n";
+print POSTOUT "cellh 0 pretranslate cellh 0 pretranslate\n";
+print POSTOUT "/maxlength 0 def         ","\n";
+print POSTOUT "/negmaxlength 0 def         ","\n";
+print POSTOUT "tablewidth totalrowwidthcalc         ","\n";
+print POSTOUT "0 tablewidth htablepad add pretranslate         ","\n";
+print POSTOUT "cellh -3 mul 0 pretranslate         ","\n";
+print POSTOUT "check_xwrap","\n";
+#end of spacer
+print POSTOUT "             } if","\n";
+print POSTOUT "                } def","\n";
 print POSTOUT "%","\n";
 print POSTOUT "%------------defines--formula-based","\n";
 print POSTOUT "%","\n";
@@ -454,12 +551,13 @@ print POSTOUT "%","\n";
 print POSTOUT "%------------drawing procs","\n";
 print POSTOUT "%","\n";
 print POSTOUT "/DoRowTitle 	{","\n";
-print POSTOUT " 0 0 moveto 0 fonth rmoveto show /HelveticaBold findfont fonth scalefont setfont","\n";
+print POSTOUT " 0 0 moveto show /HelveticaBold findfont fonth scalefont setfont","\n";
 print POSTOUT " 		} bind def","\n";
 print POSTOUT "","\n";
 print POSTOUT "/DoTableTitle	{","\n";
 print POSTOUT " /titleval exch def","\n";
-print POSTOUT " 0 cellh moveto 90 rotate titleval show -90 rotate","\n";
+#print POSTOUT " 0 cellh moveto 90 rotate titleval show -90 rotate","\n";
+print POSTOUT "  cellh cellh moveto fonth fonth rmoveto fonth -1.5 mul 0 rmoveto 90 rotate titleval show -90 rotate","\n";
 print POSTOUT "		} def","\n";
 print POSTOUT "	","\n";
 print POSTOUT "/DoCell	{","\n";
@@ -470,7 +568,7 @@ print POSTOUT " rightmargin leftmargin moveto","\n";
 print POSTOUT " 0 maxlength rlineto cellh 0 rlineto 0 negmaxlength rlineto negcellh 0 rlineto fill stroke","\n";
 print POSTOUT " rightmargin cellstrstart add leftmargin moveto","\n";
 print POSTOUT " 90 rotate 1 setgray value show -90 rotate 0 setgray","\n";
-print POSTOUT " 0 maxlength translate","\n";
+print POSTOUT " 0 maxlength pretranslate","\n";
 print POSTOUT "	} def","\n";
 print POSTOUT "","\n";
 print POSTOUT "/MakeHeaderalt{ ","\n";
@@ -480,11 +578,11 @@ print POSTOUT " devicefileprimary DoTableTitle","\n";
 print POSTOUT " (Class) DoCell","\n";
 print POSTOUT " (Driver) DoCell","\n";
 print POSTOUT " (Description) DoCell","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
 print POSTOUT " %translate down 1 row to start regular rows","\n";
-print POSTOUT " cellh 0 translate","\n";
+print POSTOUT " cellh 0 pretranslate","\n";
 print POSTOUT " 	  } bind def","\n";
 print POSTOUT "","\n";
 print POSTOUT "/MakeHeader{ ","\n";
@@ -494,11 +592,11 @@ print POSTOUT " devicefileprimary DoTableTitle","\n";
 print POSTOUT " (LVOL) DoCell","\n";
 print POSTOUT " (Mount Point) DoCell","\n";
 print POSTOUT " (Extents) DoCell","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
 print POSTOUT " %translate down 1 row to start regular rows","\n";
-print POSTOUT " cellh 0 translate","\n";
+print POSTOUT " cellh 0 pretranslate","\n";
 print POSTOUT " 	  } bind def","\n";
 print POSTOUT "","\n";
 print POSTOUT "/DoTotalandFree {","\n";
@@ -508,16 +606,16 @@ print POSTOUT "	(Total) DoCell","\n";
 print POSTOUT "	() DoCell","\n";
 print POSTOUT "	totaldisk DoCell","\n";
 print POSTOUT " %translate down 1 row","\n";
-print POSTOUT " cellh 0 translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
-print POSTOUT " 0 negmaxlength translate","\n";
+print POSTOUT " cellh 0 pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
+print POSTOUT " 0 negmaxlength pretranslate","\n";
 print POSTOUT "	(Free) DoCell","\n";
 print POSTOUT "	() DoCell","\n";
 print POSTOUT "	freedisk DoCell","\n";
-print POSTOUT "	0 negmaxlength translate","\n";
-print POSTOUT "	0 negmaxlength translate","\n";
-print POSTOUT "	0 negmaxlength translate","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
 print POSTOUT "		} def","\n";
 print POSTOUT "/DoRow	{","\n";
 print POSTOUT "	/extents exch def","\n";
@@ -527,18 +625,45 @@ print POSTOUT "%skip the title and header","\n";
 print POSTOUT "	rightmargin leftmargin moveto","\n";
 print POSTOUT "	cellstrstart 0 rmoveto 90 rotate logicalvol show -90 rotate","\n";
 print POSTOUT "	negcellstrstart 0 rmoveto","\n";
-print POSTOUT "	0 maxlength translate","\n";
+print POSTOUT "	0 maxlength pretranslate","\n";
 print POSTOUT "	rightmargin leftmargin moveto","\n";
 print POSTOUT "	cellstrstart 0 rmoveto 90 rotate filesystem show -90 rotate","\n";
 print POSTOUT "	negcellstrstart 0 rmoveto","\n";
-print POSTOUT "	0 maxlength translate","\n";
+print POSTOUT "	0 maxlength pretranslate","\n";
 print POSTOUT "	rightmargin leftmargin moveto","\n";
 print POSTOUT "	cellstrstart 0 rmoveto 90 rotate extents show -90 rotate","\n";
 print POSTOUT "	negcellstrstart 0 rmoveto","\n";
 print POSTOUT " %translate down 1 row","\n";
-print POSTOUT "	0 negmaxlength translate","\n";
-print POSTOUT "	0 negmaxlength translate","\n";
-print POSTOUT " cellh 0 translate","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
+print POSTOUT " cellh 0 pretranslate","\n";
+print POSTOUT "	} def","\n";
+print POSTOUT "/DoShadeRow	{","\n";
+print POSTOUT "	/extents exch def","\n";
+print POSTOUT "	/filesystem exch def","\n";
+print POSTOUT "	/logicalvol exch def","\n";
+print POSTOUT "%skip the title and header","\n";
+print POSTOUT "	rightmargin leftmargin moveto","\n";
+print POSTOUT "	cellstrstart 0 rmoveto 0 maxlength 2 sub rlineto cellh -1 mul -4 sub 0 rlineto 0 maxlength -1 mul 2 add rlineto cellstrstart 0 rlineto .8 setgray fill stroke 0 setgray","\n";
+print POSTOUT "	rightmargin leftmargin moveto","\n";
+print POSTOUT "	cellstrstart 0 rmoveto 90 rotate logicalvol show -90 rotate","\n";
+print POSTOUT "	negcellstrstart 0 rmoveto","\n";
+print POSTOUT "	0 maxlength pretranslate","\n";
+print POSTOUT "	rightmargin leftmargin moveto","\n";
+print POSTOUT "	cellstrstart 0 rmoveto 0 maxlength 2 sub rlineto cellh -1 mul -4 sub 0 rlineto 0 maxlength -1 mul 2 add rlineto cellstrstart 0 rlineto .8 setgray fill stroke 0 setgray","\n";
+print POSTOUT "	rightmargin leftmargin moveto","\n";
+print POSTOUT "	cellstrstart 0 rmoveto 90 rotate filesystem show -90 rotate","\n";
+print POSTOUT "	negcellstrstart 0 rmoveto","\n";
+print POSTOUT "	0 maxlength pretranslate","\n";
+print POSTOUT "	rightmargin leftmargin moveto","\n";
+print POSTOUT "	cellstrstart 0 rmoveto 0 maxlength 2 sub rlineto cellh -1 mul -4 sub 0 rlineto 0 maxlength -1 mul 2 add rlineto cellstrstart 0 rlineto .8 setgray fill stroke 0 setgray","\n";
+print POSTOUT "	rightmargin leftmargin moveto","\n";
+print POSTOUT "	cellstrstart 0 rmoveto 90 rotate extents show -90 rotate","\n";
+print POSTOUT "	negcellstrstart 0 rmoveto","\n";
+print POSTOUT " %translate down 1 row","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
+print POSTOUT "	0 negmaxlength pretranslate","\n";
+print POSTOUT " cellh 0 pretranslate","\n";
 print POSTOUT "	} def","\n";
 print POSTOUT "","\n";
 print POSTOUT "","\n";

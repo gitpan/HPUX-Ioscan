@@ -2,7 +2,7 @@ package HPUX::Ioscan;
 
 use 5.006;
 use strict;
-use warnings;
+#use warnings;
 
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
@@ -281,13 +281,20 @@ sub get_all_disks_on_controller	{
 	my $instance;
 	my @disks;
 
+	my $cval; # added to support device file sort
+	my $tval; # added to support device file sort
+	my $dval; # added to support device file sort
+	my %devfile;  #added to numerically sort device files
+	my $devfile1; #temp variable in foreach loop
+	my $total; # added to support device file sort
+	my @sorted_disks;
+
 # First find the instance
 	
 	$instance = $self->{ $arglist{controller} }->{card_instance};
 	 print "Instance: $instance\n" if $debug;
-	foreach $mainkey 	( sort { $a<=>$b } keys %{ $self } )	{
+	foreach $mainkey 	( keys %{ $self } )	{
 	 print "MainKey: $mainkey\n" if $debug;
-
 	while ( ($subkey, $subval)= sort each %{ $self->{ $mainkey } } )	{
 	 print "Subkey: $subkey\n" if $debug;
 	 print "Subval: $subval\n" if $debug;
@@ -298,8 +305,28 @@ sub get_all_disks_on_controller	{
 								}
 										}
 							}
-	return \@disks; 
+	while (<@disks>) {
+
+	/c(\d+)t(\d+)d(\d+)/;
+
+	$cval = $1;
+	if ( length($cval) < 2 ) { $cval="0".$cval };
+	$tval = $2;
+	if ( length($tval) < 2 ) { $tval="0".$tval };
+	$dval = $3;
+	if ( length($dval) < 2 ) { $dval="0".$dval };
+
+	$total = $cval.$tval.$dval;
+	print "total: $total\n" if $debug;
+
+	$devfile{$total}=$_;
+                   	}
+	foreach $devfile1 ( sort keys %devfile )        {
+        push @sorted_disks, $devfile{$devfile1};
+                                                	}
+	return \@sorted_disks; 
 				}
+
 sub get_device_hwpath	{
 	my ($self, @subargs) = @_;
 
@@ -322,10 +349,12 @@ sub get_device_hwpath	{
 	while ( ($subkey, $subval)= sort each %{ $self->{ $mainkey } } )	{
 	 print "Subkey: $subkey\n" if $debug;
 	 print "Subval: $subval\n" if $debug;
+	 if (defined ${ $self->{$mainkey}->{device_files} }[0]) {
 			if ( ${ $self->{ $mainkey }->{device_files} }[0] eq "$device_name" )	{
 		$hwpath = $self->{ $mainkey }->{hardware_path};
 		return $hwpath;
 		} 	
+								 }
 								}
 							}
 	$device_name=0;
