@@ -6,6 +6,6 @@ WriteMakefile
    'NAME'	=> 'HPUX::Ioscan',
    'VERSION_FROM' => 'Ioscan.pm',
    ($] >= 5.005 ?
-    (ABSTRACT   => 'Perl function to handle HPUX ioscan command',
-     AUTHOR     => 'Dominique Dumont (domi@barrayar.grenoble.hp.com)') : ())
+    (ABSTRACT   => 'Perl module to handle HPUX ioscan command',
+     AUTHOR     => 'Chris White (based on Dominique Dumonts (chrwhite@seanet.com)') : ())
   );

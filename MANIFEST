@@ -2,5 +2,8 @@ Ioscan.pm
 Makefile.PL
 MANIFEST
 README
-t/ioscan.t
-t/real.t
+t/ioscan_info.dat
+t/oo_Ioscan_test.t
+contrib/hp_disk_info.README
+contrib/hp_disk_info.cgi
+contrib/hp_disk_info_launcher.cgi
